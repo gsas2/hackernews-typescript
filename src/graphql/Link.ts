@@ -1,6 +1,4 @@
-import { argsToArgsConfig } from "graphql/type/definition";
-import { extendType, idArg, intArg, nonNull, objectType, stringArg } from "nexus";
-import { NexusGenObjects } from '../../nexus-typegen';
+import { extendType, idArg, nonNull, objectType, stringArg } from "nexus";
 
 export const Link = objectType({
   name: "Link",
@@ -8,6 +6,14 @@ export const Link = objectType({
     t.nonNull.int("id");
     t.nonNull.string("description");
     t.nonNull.string("url");
+    t.field('postedBy', {
+      type: 'User',
+      resolve(parent, args, context) {
+        return context.prisma.link
+          .findUnique({ where: { id: parent.id }})
+          .postedBy();
+      }
+    })
   }
 });
 
@@ -19,13 +25,8 @@ export const LinkQuery = extendType({
       resolve(parent, args, context, info) {
         return context.prisma.link.findMany();
       }
-    })
-  },
-});
+    });
 
-export const LinkDetail = extendType({
-  type: "Query",
-  definition(t) {
     t.nullable.field("link", {
       type: "Link",
       args: {
@@ -38,10 +39,9 @@ export const LinkDetail = extendType({
           }
         });
       }
-    })
+    });
   },
 });
-
 
 export const LinkMutation = extendType({
   type: "Mutation",
@@ -55,21 +55,25 @@ export const LinkMutation = extendType({
 
       resolve(parent, args, context) {
         const { description, url } = args;
+        const { userId } = context;
+
+        if (!userId) {
+          throw new Error('Cannot post without logging in.');
+        }
+
         const newLink = context.prisma.link.create({
           data: {
             description,
-            url
+            url,
+            postedBy: {
+              connect: { id: userId }
+            }
           }
         })
         return newLink;
       }
     });
-  },
-});
 
-export const LinkUpdateMutation = extendType({
-  type: "Mutation",
-  definition(t) {
     t.nonNull.field('updateLink', {
       type: 'Link',
       args: {
@@ -91,13 +95,7 @@ export const LinkUpdateMutation = extendType({
         return linkToUpdate;
       }
     });
-  },
-});
 
-
-export const LinkDeleteMutation = extendType({
-  type: "Mutation",
-  definition(t) {
     t.nonNull.field('deleteLink', {
       type: 'Link',
       args: {
@@ -114,3 +112,4 @@ export const LinkDeleteMutation = extendType({
     });
   },
 });
+
